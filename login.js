@@ -21,17 +21,34 @@ client
 
 router.use(express.json());
 
+function verifyAccessToken(token) {
+  const secret = "secretKey";
+
+  try {
+    const decoded = jwt.verify(token, secret);
+    return { success: true, data: decoded };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+}
+
 // Middleware to verify JWT token
 function authenticateToken(req, res, next) {
-  const token = req.headers["authorization"];
-  if (!token) return res.status(401).json({ message: "Token not provided" });
+  const authHeader = req.headers["authorization"];
+  const token = authHeader && authHeader.split(" ")[1];
 
-  jwt.verify(token, "secretKey", (err, user) => {
-    console.log(err, "errr", user, "userrr");
-    if (err) return res.status(403).json({ message: "Invalid token" });
-    req.user = user;
-    next();
-  });
+  if (!token) {
+    return res.sendStatus(401);
+  }
+
+  const result = verifyAccessToken(token);
+
+  if (!result.success) {
+    return res.status(403).json({ error: result.error });
+  }
+
+  req.user = result;
+  next();
 }
 
 router.post("/", async (req, res) => {
@@ -43,9 +60,13 @@ router.post("/", async (req, res) => {
     const user = await usersCollection.findOne({ username, password });
     if (user) {
       // Generate JWT token
-      const token = jwt.sign({ username: user.username }, "secretKey", {
-        expiresIn: "1h",
-      });
+      const token = jwt.sign(
+        { userId: user._id, username: user.username },
+        "secretKey",
+        {
+          expiresIn: "1h",
+        }
+      );
 
       // Send token along with success response
       res
@@ -66,7 +87,6 @@ router.post("/", async (req, res) => {
 // Example API using authentication middleware
 router.get("/protected", authenticateToken, (req, res) => {
   // Only accessible with valid token
-  console.log(req.user);
   res.json({ message: "Protected API accessed successfully", user: req.user });
 });
 
