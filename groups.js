@@ -131,9 +131,9 @@ router.get("/groups/:groupId", async (req, res) => {
   try {
     // Find the group by groupId where the user is a member
     const group = await groupsCollection.findOne({
-      _id: groupId,
+      _id: new ObjectId(groupId),
     });
-
+    console.log(group, groupId);
     if (!group) {
       // If group is not found or user is not a member, return 404 Not Found
       return res.status(404).json({ message: "Group not found" });
@@ -143,6 +143,45 @@ router.get("/groups/:groupId", async (req, res) => {
   } catch (error) {
     console.error("Error fetching group:", error);
     res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+router.post("/groups/:groupId/payments", async (req, res) => {
+  const { groupId } = req.params;
+  const paymentData = req.body;
+
+  const db = client.db(); // Access MongoDB client
+  const groupsCollection = db.collection("groups");
+
+  const { ObjectId } = require("mongodb"); // Import ObjectId from MongoDB
+
+  try {
+    // Find the group by groupId
+    const group = await groupsCollection.findOne({
+      _id: new ObjectId(groupId), // Convert groupId to ObjectId type
+    });
+
+    if (!group) {
+      return res.status(404).json({ error: "Group not found" });
+    }
+    if (!group.payments) {
+      group.payments = []; // Initialize payments array if it doesn't exist
+    }
+    // Add the payment object to the payments array
+    group.payments.push(paymentData);
+
+    // Update the group document
+    await groupsCollection.updateOne(
+      { _id: new ObjectId(groupId) }, // Filter by groupId
+      { $set: { payments: group.payments } } // Update the payments array
+    );
+
+    res
+      .status(201)
+      .json({ message: "Payment added successfully", success: true });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Internal Server Error" });
   }
 });
 
