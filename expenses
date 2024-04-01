@@ -1,0 +1,22 @@
+router.post("/groups/:groupId/expenses", async (req, res) => {
+  const { groupId } = req.params;
+  const paymentData = req.body;
+
+  const db = client.db(); // Access MongoDB client
+  const expensesCollection = db.collection("expenses");
+
+  const { ObjectId } = require("mongodb"); // Import ObjectId from MongoDB
+
+  try {
+    // Add groupId to paymentData
+    paymentData.groupId = groupId;
+
+    // Insert paymentData into expenses collection
+    await expensesCollection.insertOne(paymentData);
+
+    res.status(201).json({ message: "Payment added to expenses collection successfully", success: true });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
