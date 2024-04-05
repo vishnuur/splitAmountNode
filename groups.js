@@ -1,6 +1,7 @@
 // Import necessary modules
 const express = require("express");
 const { MongoClient, ObjectId } = require("mongodb");
+const moment = require("moment");
 
 const uri = "mongodb://localhost:27017/mydatabase"; // MongoDB connection URI
 const client = new MongoClient(uri, {
@@ -227,6 +228,70 @@ router.get("/find-userId", async (req, res) => {
   } catch (error) {
     console.error("Error fetching user ID:", error);
     res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+router.get("/expenseChartBar/:groupId", async (req, res) => {
+  const groupId = req.params.groupId;
+
+  try {
+    const db = client.db();
+    const expensesCollection = db.collection("expenses");
+
+    const expenses = await expensesCollection.find({ groupId }).toArray();
+
+    // Grouping expenses by month
+    const monthlyExpenses = {};
+    expenses.forEach((expense) => {
+      const month = moment(expense.date).format("MMMM");
+      if (!monthlyExpenses[month]) {
+        monthlyExpenses[month] = 0;
+      }
+      monthlyExpenses[month] += parseFloat(expense.amount);
+    });
+
+    // Convert monthly expenses object to array
+    const result = Object.keys(monthlyExpenses).map((month) => ({
+      label: month,
+      value: monthlyExpenses[month],
+    }));
+
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+router.get("/expensesPieChart/:groupId", async (req, res) => {
+  const groupId = req.params.groupId;
+
+  try {
+    const db = client.db();
+    const expensesCollection = db.collection("expenses");
+
+    const expenses = await expensesCollection.find({ groupId }).toArray();
+
+    // Grouping expenses by expenseType
+    const expenseTypeMap = {};
+    expenses.forEach((expense) => {
+      const { expenseType, amount } = expense;
+      if (!expenseTypeMap[expenseType]) {
+        expenseTypeMap[expenseType] = 0;
+      }
+      expenseTypeMap[expenseType] += amount;
+    });
+
+    // Create an array of objects from the expenseTypeMap
+    const result = Object.keys(expenseTypeMap).map((expenseType) => ({
+      key: expenseType,
+      value: expenseTypeMap[expenseType],
+      color: randomColor(),
+      gradientCenterColor: randomColor(),
+    }));
+
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
   }
 });
 
